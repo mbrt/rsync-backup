@@ -1,0 +1,12 @@
+version: v1
+backups:
+  - name: "micheleb"
+    src: "~"
+    srcDirs:
+      - "Calibre Library"
+      - "Documents"
+      - "Music"
+      - "Pictures"
+      - "VirtualBox VMs"
+      - "Videos/Miei"
+    dest: ""
