@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import datetime as dt
 import os
 import sys
 import subprocess
@@ -7,6 +8,7 @@ import yaml
 
 
 DRY_RUN = False
+BACKUP_STATE_VERSION = "v1"
 
 
 class AbortException(Exception):
@@ -44,7 +46,7 @@ def add_leading_slash(path):
         return path + "/"
 
 
-def backup(conf):
+def backup_section(conf):
     try:
         for sub_src in conf.src_dirs:
             ensure_dest(conf.dest, sub_src)
@@ -59,19 +61,22 @@ def backup(conf):
 
 
 class BackupConf(object):
-    def __init__(self, name, src, src_dirs, dest):
+    def __init__(self, name, every, src, src_dirs, dest):
         self.name = name
+        self.every = every
         self.src = os.path.expanduser(src)
         self.src_dirs = src_dirs
         self.dest = os.path.expanduser(dest)
 
 
-def parse_conf(path):
+def parse_conf():
+    path = path_to_conf("config.yaml")
     with open(path) as f:
         conf = yaml.safe_load(f)
     result = []
     for b in conf["backups"]:
-        result.append(BackupConf(b["name"], b["src"], b["srcDirs"], b["dest"]))
+        result.append(BackupConf(b["name"], b["everyDays"], b["src"],
+                                 b["srcDirs"], b["dest"]))
     return result
 
 
@@ -81,29 +86,86 @@ def dump_summary(summary):
         print("{}: {}".format(n, "done" if done else "SKIPPED"))
 
 
-def main():
-    global DRY_RUN
-    DRY_RUN = "--dry-run" in sys.argv
-    try:
-        conf_file = os.path.join(os.environ["HOME"], ".rsync-backup.yaml")
-        conf = parse_conf(conf_file)
+class BackupState(object):
+    def __init__(self, conf=None):
+        if conf is None:
+            self.conf = {"version": BACKUP_STATE_VERSION, "backups": {}}
+        else:
+            self.conf = conf
 
+    def write_to_file(self, path):
+        with open(path, "w") as f:
+            f.write(yaml.dump(self.conf))
+
+
+def parse_backup_state():
+    path = path_to_conf("state.yaml")
+    try:
+        with open(path) as f:
+            conf = yaml.load(f)
+    except:
+        conf = None
+    return BackupState(conf)
+
+
+def write_backup_dates(state, summary):
+    for name, done in summary.items():
+        if done:
+            section = {"lastBackup": dt.datetime.now()}
+            state.conf["backups"][name] = section
+    path = path_to_conf("state.yaml")
+    state.write_to_file(path)
+
+
+def path_to_conf(name):
+    return os.path.join(os.environ["HOME"], ".rsync-backup", name)
+
+
+def backup():
+    try:
+        conf = parse_conf()
         summary = {}
+
         for backup_conf in conf:
             summary[backup_conf.name] = False
 
-        for backup_conf in conf:
-            print("Backup {}:".format(backup_conf.name))
-            res = backup(backup_conf)
-            summary[backup_conf.name] = res
+        for c in conf:
+            print("Backup {}:".format(c.name))
+            res = backup_section(c)
+            summary[c.name] = res
 
         dump_summary(summary)
+        write_backup_dates(parse_backup_state(), summary)
 
     except KeyboardInterrupt:
         print("ctrl-c received: aborted")
         dump_summary(summary)
     except Exception as e:
         print("Error executing backup: {}".format(e))
+
+
+def check_need_backup():
+    try:
+        state = parse_backup_state()
+        conf = parse_conf()
+        for c in conf:
+            every = c.every
+            s = state.conf["backups"].get(c.name, {})
+            now = dt.datetime.now()
+            if not s or s["lastBackup"] + dt.timedelta(days=every) < now:
+                print("backup {} is outdated: need to backup now!"
+                      .format(c.name))
+    except Exception as e:
+        print("Error checking backup state: {}".format(e))
+
+
+def main():
+    global DRY_RUN
+    DRY_RUN = "--dry-run" in sys.argv
+    if "--check-need-backup" in sys.argv:
+        check_need_backup()
+    else:
+        backup()
 
 
 if __name__ == "__main__":

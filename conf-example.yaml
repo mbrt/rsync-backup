@@ -1,6 +1,7 @@
 version: v1
 backups:
   - name: "micheleb"
+    everyDays: 7
     src: "~"
     srcDirs:
       - "Calibre Library"
