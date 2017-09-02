@@ -3,4 +3,4 @@ Description=Check rsync-backup
 
 [Service]
 Type=oneshot
-ExecStart=@HOME@/bin/rsync-backup --check-need-backup --use-notify-send
+ExecStart=%h/bin/rsync-backup --check-need-backup --use-notify-send

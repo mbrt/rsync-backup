@@ -19,7 +19,6 @@ install -d "${rsync-backup}"
 install -d "${unitdir}"
 install -m 644 rsync-backup-check.service "${unitdir}"
 install -m 644 rsync-backup-check.timer "${unitdir}"
-sed -i "s#@HOME@#$HOME#" "${unitdir}/rsync-backup-check.service"
 
 # enable the timer and reload
 systemctl --user daemon-reload
