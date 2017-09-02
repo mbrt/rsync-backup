@@ -144,7 +144,18 @@ def backup():
         print("Error executing backup: {}".format(e))
 
 
-def check_need_backup():
+def notify_outdated_backup(name, use_notify_send):
+    msg = "backup {} is outdated: need to backup now!".format(name)
+    print(msg)
+
+    if use_notify_send:
+        ret = subprocess.call(["notify-send", "--urgency=normal",
+                               "--app-name=rsync-backup", msg])
+        if ret != 0:
+            print("failed to use notify-send")
+
+
+def check_need_backup(use_notify_send):
     try:
         state = parse_backup_state()
         conf = parse_conf()
@@ -153,8 +164,7 @@ def check_need_backup():
             s = state.conf["backups"].get(c.name, {})
             now = dt.datetime.now()
             if not s or s["lastBackup"] + dt.timedelta(days=every) < now:
-                print("backup {} is outdated: need to backup now!"
-                      .format(c.name))
+                notify_outdated_backup(c.name, use_notify_send)
     except Exception as e:
         print("Error checking backup state: {}".format(e))
 
@@ -163,7 +173,7 @@ def main():
     global DRY_RUN
     DRY_RUN = "--dry-run" in sys.argv
     if "--check-need-backup" in sys.argv:
-        check_need_backup()
+        check_need_backup("--use-notify-send" in sys.argv)
     else:
         backup()
 
