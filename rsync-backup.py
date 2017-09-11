@@ -11,7 +11,7 @@ DRY_RUN = False
 BACKUP_STATE_VERSION = "v1"
 
 
-class AbortException(Exception):
+class RsyncException(Exception):
     pass
 
 
@@ -26,7 +26,7 @@ def rsync(args):
 
     ret = subprocess.call(["rsync"] + args)
     if ret != 0:
-        raise AbortException("error executing rsync: {}".format(ret))
+        raise RsyncException("error executing rsync: {}".format(ret))
 
 
 def ensure_dest(root, subpath):
@@ -54,6 +54,9 @@ def backup_section(conf):
             dest = add_leading_slash(os.path.join(conf.dest, sub_src))
             rsync(["-av", "--delete", src, dest])
         return True
+    except RsyncException as e:
+        print("ERROR rsync: {}".format(e))
+        return False
     except SkipException as e:
         print("WARNING: skipping unavailable destination : {}"
               .format(conf.dest))
